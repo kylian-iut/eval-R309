@@ -16,11 +16,12 @@ from PyQt6.QtWidgets import (
 )
 power = False
 retour=""
+clients=[]
 
-def printwn(txt):
+def print(txt):
     global retour
     global window
-    retour=f"{retour}\n{txt}"
+    retour=f"{retour} \r {txt}"
     window.sortie.setText(retour)
 
 class MainWindow(QMainWindow):
@@ -55,13 +56,21 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.nb_client_max,2,1)
 
         self.btn = QPushButton("Démarrage du serveur")
-        self.btn.pressed.connect(self.start)
+        if power:
+            self.btn.pressed.connect(self.stop)
+        else:
+            self.btn.pressed.connect(self.start)
         layout.addWidget(self.btn,3,0,1,2)
 
         self.sortie = QLineEdit()
         self.sortie.setReadOnly(True)
         self.sortie.dragEnabled()
+        self.sortie.setTextMargins(0,100,0,100)
         layout.addWidget(self.sortie,4,0,3,2)
+        
+        self.exit = QPushButton("Quitter")
+        self.exit.pressed.connect(exit)
+        layout.addWidget(self.exit,9,0,1,2)
 
         widget = QWidget()
         widget.setLayout(layout)
@@ -74,20 +83,22 @@ class MainWindow(QMainWindow):
             nb_client_max = int(self.nb_client_max.text())
 
             self.btn.setText("Arrêt du serveur")
-            self.btn.pressed.connect(self.stop)
-            session(ip,port,nb_client_max)
+            self.exit.pressed.connect(self.stop)
+            t = threading.Thread(target=session, args=(ip,port,nb_client_max))
+            t.start()
+            
+            power = True
 
         except ValueError:
             self.show_error("Valeur incorrect : caractère incompatible")
 
     def stop(self):
         try:
-            ip = self.ip.text()
-            port = int(self.port.text())
-            nb_client_max = int(self.nb_client_max.text())
+            shutdown_event.set()
 
             self.btn.setText("Démarrage du serveur")
-            self.btn.pressed.connect(self.start)
+            
+            power = False
 
         except ValueError:
             self.show_error("Valeur incorrect : caractère incompatible")
@@ -98,21 +109,6 @@ class MainWindow(QMainWindow):
         msg.setText(message)
         msg.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg.exec()
-        
-    def help(self):
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Aide")
-        msg.setText("Permet de convertir une température soit de Kelvin en Celsius, soit de Celsius vers Kelvin")
-        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg.exec()
-
-    def update_labels(self):
-        if self.combobox.currentText() == "°C -> K":
-            self.T1label.setText("°C")
-            self.T2label.setText("K")
-        else:
-            self.T1label.setText("K")
-            self.T2label.setText("°C")
 
 def session(ip,port,nb_client_max):
     global shutdown_event
@@ -124,7 +120,7 @@ def session(ip,port,nb_client_max):
         server_socket.close()
         return
     server_socket.listen(nb_client_max)
-    printwn("Serveur démarré et en attente de connexions...")
+    print("Serveur démarré et en attente de connexions...")
 
     while not shutdown_event.is_set():
         conn, address = server_socket.accept()
